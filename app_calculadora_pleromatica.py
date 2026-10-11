@@ -328,7 +328,7 @@ st.set_page_config(
 
 st.title("🌌 Calculadora de Código Pleromático y Genio Biológico")
 st.markdown("""
-Esta aplicación permite calcular instantáneamente tu **Código Arcóntico**, **Código Pleromático**, **Voltaje de Canal** y las **Ventanas Temporales de Activación**, generando automáticamente tu **Guía Rápida de Bolsillo en PDF**.
+Esta aplicación permite calcular instantáneamente tu **Código Arcóntico**, **Código Pleromático**, **Voltaje de Canal** y las **Ventanas Temporales de Activación**, generando automáticamente tu **Guía Rápida de Bolsillo en PDF** y permitiendo explorar la **Búsqueda Histórica de Frecuencias**.
 """)
 
 st.sidebar.header("📋 Datos de Entrada")
@@ -356,7 +356,7 @@ anio_input = st.sidebar.number_input(
 perfil = calcular_perfil_pleromatico(nombre_input, fecha_input, grupo_input, anio_input)
 
 # Pestañas principales
-tab1, tab2, tab3 = st.tabs(["📊 Resumen de Códigos", "📅 Ventanas Temporales", "📄 Generar Guía PDF"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Resumen de Códigos", "📅 Ventanas Temporales", "📄 Generar Guía PDF", "📜 Búsqueda Histórica"])
 
 with tab1:
     st.subheader(f"Ficha Pleromática: {perfil['nombre']}")
@@ -415,6 +415,78 @@ with tab3:
         file_name=nombre_archivo,
         mime="application/pdf"
     )
+
+with tab4:
+    st.subheader("📜 Búsqueda Histórica de Frecuencias de Reinicio")
+    st.markdown("""
+    Explora la recurrencia histórica de tu **Nodo Crítico / Código de Reinicio** desde el año 0 hasta el presente.
+    Descubre en qué años y siglos se ha activado esta misma matriz frecuencial en el calendario.
+    """)
+    
+    col_h1, col_h2, col_h3 = st.columns(3)
+    with col_h1:
+        nodo_target = st.number_input("Nodo Crítico a buscar:", min_value=1, max_value=100, value=int(perfil['nodo_critico']))
+    with col_h2:
+        modo_busqueda = st.selectbox("Ámbito de Búsqueda:", ["Fecha Personalizada (Día/Mes/Rh del Sujeto)", "Todas las fechas del calendario"])
+    with col_h3:
+        rango_anios = st.slider("Rango de Años:", min_value=0, max_value=2026, value=(0, 2026))
+        
+    anio_inicio, anio_fin = rango_anios
+    
+    if modo_busqueda == "Fecha Personalizada (Día/Mes/Rh del Sujeto)":
+        dia_p = perfil['fecha'].day
+        mes_p = perfil['fecha'].month
+        rh_f = perfil['factor_rh']
+        constante = (dia_p * rh_f) + reducir_numero(mes_p)
+        req_anio_red = nodo_target - constante
+        
+        st.info(f"📍 **Parámetros:** Fecha {dia_p}/{mes_p} ({perfil['grupo_sangre']}) | Constante base: `{constante}` | Año reducido requerido: `{req_anio_red}`")
+        
+        if 1 <= req_anio_red <= 9:
+            anios_coincidentes = [yr for yr in range(max(1, anio_inicio), anio_fin + 1) if reducir_numero(yr) == req_anio_red]
+            st.success(f"✨ Se encontraron **{len(anios_coincidentes)} años** entre el año {anio_inicio} y {anio_fin} con la frecuencia exacta de reinicio **{nodo_target}** para la fecha {dia_p}/{mes_p}.")
+            
+            siglos_dict = {}
+            for yr in anios_coincidentes:
+                siglo = (yr - 1) // 100 + 1
+                siglos_dict.setdefault(f"Siglo {siglo}", []).append(yr)
+                
+            col_s1, col_s2 = st.columns([1, 2])
+            with col_s1:
+                st.metric("Total de Ocurrencias Históricas", len(anios_coincidentes))
+                st.write("**Resumen por Siglos recientes:**")
+                for sig in list(siglos_dict.keys())[-10:]:
+                    st.write(f"• **{sig}:** {len(siglos_dict[sig])} veces ({', '.join(str(y) for y in siglos_dict[sig])})")
+            with col_s2:
+                st.write("**Listado Completo de Años coincidentes:**")
+                st.write(", ".join(str(y) for y in anios_coincidentes))
+        else:
+            st.warning(f"La combinación de fecha {dia_p}/{mes_p} ({perfil['grupo_sangre']}) con constante base {constante} no puede alcanzar matemáticamente un Nodo Crítico de {nodo_target} (el año reducido debe estar entre 1 y 9).")
+    else:
+        st.info(f"🔍 Buscando todas las fechas del calendario ({perfil['grupo_sangre']}) entre los años {anio_inicio} y {anio_fin} que suman el Nodo Crítico {nodo_target}...")
+        
+        total_coincidencias = 0
+        fechas_ejemplo = []
+        
+        rh_f = perfil['factor_rh']
+        for m in range(1, 13):
+            max_d = calendar.monthrange(2024, m)[1]
+            for d in range(1, max_d + 1):
+                constante = (d * rh_f) + reducir_numero(m)
+                req_yr = nodo_target - constante
+                if 1 <= req_yr <= 9:
+                    matching_yrs = [yr for yr in range(max(1, anio_inicio), anio_fin + 1) if reducir_numero(yr) == req_yr]
+                    total_coincidencias += len(matching_yrs)
+                    if matching_yrs:
+                        fechas_ejemplo.append({
+                            "Día/Mes": f"{d:02d}/{m:02d}",
+                            "Año Reducido Requerido": req_yr,
+                            "Cantidad de Años en el Rango": len(matching_yrs),
+                            "Ejemplo de Años Recientes": ", ".join(str(y) for y in matching_yrs[-5:])
+                        })
+                        
+        st.success(f"✨ Se encontraron **{total_coincidencias} fechas/años globales** en el rango {anio_inicio}-{anio_fin} que activan el Nodo Crítico {nodo_target}.")
+        st.dataframe(fechas_ejemplo, width='stretch')
 
 st.markdown("---")
 st.caption("Sistema de Regulación Biológica e Hibridación Sanguínea | Generado con Streamlit & ReportLab")
